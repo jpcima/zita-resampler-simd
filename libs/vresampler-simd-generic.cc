@@ -17,6 +17,8 @@ int VResampler::PROCESS_FUNCTION ()
     unsigned int n = (2 * hl - nr);
     float *p1 = _buff + in;
     float *p2 = p1 + n;
+    float *c1 = _c1;
+    float *c2 = _c2;
 
     while (out_count)
     {
@@ -53,8 +55,8 @@ int VResampler::PROCESS_FUNCTION ()
                         PRAGMA_OMP("omp simd")
                         for (int i = 0; i < hl; i++)
                         {
-                            _c1 [i] = a * q1 [i] + b * q1 [i + hl];
-                            _c2 [i] = a * q2 [i] + b * q2 [i - hl];
+                            c1 [i] = a * q1 [i] + b * q1 [i + hl];
+                            c2 [i] = a * q2 [i] + b * q2 [i - hl];
                         }
                     }
                     {
@@ -63,7 +65,7 @@ int VResampler::PROCESS_FUNCTION ()
                         float a = 1e-25f;
                         PRAGMA_OMP("omp simd reduction(+: a)")
                         for (int i = 0; i < hl; i++)
-                            a += *q1++ * _c1 [i] + *--q2 * _c2 [i];
+                            a += *q1++ * c1 [i] + *--q2 * c2 [i];
                         *out_data++ = a - 1e-25f;
                     }
                 }

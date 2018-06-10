@@ -32,6 +32,10 @@ public:
     VResampler ();
     ~VResampler ();
 
+    void detect_cpu();
+    bool set_cpu(const char *name);
+    const char *get_cpu() const;
+
     int  setup (double       ratio,
                 unsigned int hlen);
 
@@ -43,17 +47,7 @@ public:
     int    reset ();
     int    inpsize () const;
     double inpdist () const;
-
-    // Generic Scalar
     int    process();
-    // X86 SSE
-    int    process_sse();
-    // X86 AVX
-    int    process_avx();
-    // X86 AVX-512
-    int    process_avx512();
-    // Other OpenMP
-    int    process_omp();
 
     void set_phase (double p);
     void set_rrfilt (double t);
@@ -83,7 +77,19 @@ private:
     float               *_buff;
     float               *_c1;
     float               *_c2;
-    void                *_dummy [8];
+    int    (VResampler::*_process)();
+
+public:
+    // Generic Scalar
+    int    process_default();
+    // X86 SSE
+    int    process_sse();
+    // X86 AVX
+    int    process_avx();
+    // X86 AVX-512
+    int    process_avx512f();
+    // Other OpenMP
+    int    process_omp();
 };
 
 

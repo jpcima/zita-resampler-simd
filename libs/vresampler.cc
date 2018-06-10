@@ -23,7 +23,34 @@
 #include <string.h>
 #include <math.h>
 #include <zita-resampler/vresampler.h>
+#include "cpucheck.h"
+#include "cputest.h"
 
+struct CpuDispatchEntry {
+    const char *name;
+    int (VResampler::*process_fn)();
+    void (*cputest_fn)(float *);
+};
+
+static const CpuDispatchEntry cpu_dispatch_table[] = {
+#if defined(BUILD_TARGET_avx512f)
+    {"avx512f", &VResampler::process_avx512f, &ZitaResampler::cputest_avx512f},
+#endif
+#if defined(BUILD_TARGET_avx)
+    {"avx", &VResampler::process_avx, &ZitaResampler::cputest_avx},
+#endif
+#if defined(BUILD_TARGET_sse)
+    {"sse", &VResampler::process_sse, &ZitaResampler::cputest_sse},
+#endif
+#if defined(BUILD_TARGET_omp)
+    {"omp", &VResampler::process_omp, &ZitaResampler::cputest_omp},
+#endif
+};
+
+enum {
+    cpu_dispatch_len =
+        sizeof (cpu_dispatch_table) / sizeof (*cpu_dispatch_table),
+};
 
 VResampler::VResampler () :
     _table (0),
@@ -31,6 +58,7 @@ VResampler::VResampler () :
     _c1 (0),
     _c2 (0)
 {
+    detect_cpu ();
     reset ();
 }
 
@@ -40,6 +68,44 @@ VResampler::~VResampler ()
     clear ();
 }
 
+void VResampler::detect_cpu()
+{
+    bool cpufound = false;
+    for (size_t i = 0; i < cpu_dispatch_len; ++i)
+    {
+        if (ZitaResampler::cpucheck (cpu_dispatch_table[i].cputest_fn))
+        {
+            _process = cpu_dispatch_table[i].process_fn;
+            cpufound = true;
+        }
+    }
+    if (!cpufound)
+        _process = &VResampler::process_default;
+}
+
+bool VResampler::set_cpu(const char *name)
+{
+    for (size_t i = 0; i < cpu_dispatch_len; ++i)
+    {
+        if (!strcmp (name, cpu_dispatch_table[i].name))
+        {
+            _process = cpu_dispatch_table[i].process_fn;
+            return true;
+        }
+    }
+    _process = &VResampler::process_default;
+    return false;
+}
+
+const char *VResampler::get_cpu() const
+{
+    for (size_t i = 0; i < cpu_dispatch_len; ++i)
+    {
+        if (_process == cpu_dispatch_table[i].process_fn)
+            return cpu_dispatch_table[i].name;
+    }
+    return "generic";
+}
 
 int VResampler::setup (double       ratio,
                        unsigned int hlen)
@@ -154,4 +220,9 @@ int VResampler::reset ()
     _nread = 2 * _table->_hl;
     _nzero = 0;
     return 0;
+}
+
+int VResampler::process()
+{
+    return (this->*_process)();
 }
