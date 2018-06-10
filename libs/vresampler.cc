@@ -110,7 +110,7 @@ const char *VResampler::get_cpu() const
 int VResampler::setup (double       ratio,
                        unsigned int hlen)
 {
-    if ((hlen < 8) || (hlen > 96) || (16 * ratio < 1) || (ratio > 256)) return 1;
+    if ((hlen < 16) || (hlen > 96) || (hlen % 16) || (16 * ratio < 1) || (ratio > 256)) return 1;
     return setup (ratio, hlen, 1.0 - 2.6 / hlen);
 }
 
